@@ -7,14 +7,17 @@ RUN apt-get -y upgrade
 # INSTALLATIONS
 RUN apt-get -y install nginx
 RUN apt-get -y install mariadb-server
-RUN apt-get -y install php7.3 php-mysql php-fpm php-mbstring
+RUN apt-get -y install php-mysql php-fpm php-mbstring
 RUN apt-get -y install wget
 
 #COPY FILES
 
 COPY ./srcs/wordpress.tar.gz /var/www/html/
+COPY ./srcs/wp-config.php /var/www/html
 COPY ./srcs/mysql_setup.sql /var
 COPY ./srcs/wordpress.sql /var
+COPY srcs/nginx-config etc/nginx/sites-available/
+RUN ln -s /etc/nginx/sites-available/nginx-config etc/nginx/sites-enabled/
 
 # INSTALL PHPMYADMIN
 WORKDIR /var/www/html/
