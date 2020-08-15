@@ -12,12 +12,12 @@ RUN apt-get -y install wget
 
 #COPY FILES
 
-COPY ./srcs/wordpress.tar.gz /var/www/html/
-COPY ./srcs/wp-config.php /var/www/html
-COPY ./srcs/mysql_setup.sql /var
-COPY ./srcs/wordpress.sql /var
 COPY srcs/nginx-config etc/nginx/sites-available/
-RUN ln -s /etc/nginx/sites-available/nginx-config etc/nginx/sites-enabled/
+RUN  ln -s /etc/nginx/sites-available/nginx-config etc/nginx/sites-enabled/
+COPY srcs/wordpress.tar.gz /var/www/html/
+COPY srcs/wp-config.php /var/www/html
+COPY srcs/mysql_setup.sql ./root
+COPY srcs/wordpress.sql ./root
 
 # INSTALL PHPMYADMIN
 WORKDIR /var/www/html/
@@ -30,7 +30,12 @@ RUN tar xf /var/www/html/wordpress.tar.gz && rm -rf /var/www/html/wordpress.tar.
 RUN chmod 755 -R wordpress
 
 # SETUP SERVER
-RUN service mysql start && mysql -u root mysql < /var/mysql_setup.sql && mysql wordpress -u root --password= < /var/wordpress.sql
+
+RUN service mysql start && \
+    echo "CREATE DATABASE wordpress;" | mysql -u root && \
+    echo "GRANT ALL PRIVILEGES ON wordpress.* TO 'root'@'localhost';" | mysql -u root && \
+    echo "update mysql.user set plugin = 'mysql_native_password' where user='root';" | mysql -u root  && \
+    mysql wordpress -u root --password=  < ./root/wordpress.sql
 RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj '/C=FR/ST=75/L=Paris/O=42/CN=sdunckel' -keyout /etc/ssl/certs/localhost.key -out /etc/ssl/certs/localhost.crt
 RUN chown -R www-data:www-data *
 RUN chmod 755 -R *
