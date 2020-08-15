@@ -15,34 +15,48 @@ RUN apt-get -y install wget
 COPY srcs/nginx-config etc/nginx/sites-available/
 RUN  ln -s /etc/nginx/sites-available/nginx-config etc/nginx/sites-enabled/
 COPY srcs/wordpress.tar.gz /var/www/html/
-COPY srcs/wp-config.php /var/www/html
-COPY srcs/mysql_setup.sql ./root
-COPY srcs/wordpress.sql ./root
+COPY srcs/wp-config.php /var/www/html/
+COPY srcs/mysql_setup.sql ./root/
+COPY srcs/wordpress.sql ./root/
+RUN service mysql start && \
+    echo "CREATE DATABASE wordpress;"| mysql -u root && \
+    echo "GRANT ALL PRIVILEGES ON wordpress.* TO 'root'@'localhost';"| mysql -u root && \
+    echo "update mysql.user set plugin = 'mysql_native_password' where user='root';"| mysql -u root  && \
+    mysql wordpress -u root --password=  < ./root/wordpress.sql
 
 # INSTALL PHPMYADMIN
-WORKDIR /var/www/html/
-RUN wget https://files.phpmyadmin.net/phpMyAdmin/4.9.1/phpMyAdmin-4.9.1-english.tar.gz
-RUN tar xf phpMyAdmin-4.9.1-english.tar.gz && rm -rf phpMyAdmin-4.9.1-english.tar.gz
-RUN mv phpMyAdmin-4.9.1-english phpmyadmin
+COPY srcs/config.inc.php ./root/
+RUN wget https://files.phpmyadmin.net/phpMyAdmin/5.0.2/phpMyAdmin-5.0.2-english.tar.gz && \
+mkdir /var/www/html/phpmyadmin && \
+tar xzf phpMyAdmin-5.0.2-english.tar.gz --strip-components=1 -C /var/www/html/phpmyadmin && \
+cp /root/config.inc.php /var/www/html/phpmyadmin/
+RUN chmod 660 var/www/html/phpmyadmin/config.inc.php && chown -R www-data:www-data /var/www/html/phpmyadmin
 
 #INSTALL WORDPRESS
-RUN tar xf /var/www/html/wordpress.tar.gz && rm -rf /var/www/html/wordpress.tar.gz
-RUN chmod 755 -R wordpress
+RUN cd var/www/html && wget http://wordpress.org/latest.tar.gz  && \
+tar -xzvf latest.tar.gz && rm latest.tar.gz 
+RUN cd var/www/html && cp -a wordpress/* . 
+RUN chown -R www-data:www-data /var/www/html/ && chmod -R 755 /var/www/html/  
+COPY srcs/wp-config.php /var/www/html/wordpress
 
-# SETUP SERVER
-
-RUN service mysql start && \
-    echo "CREATE DATABASE wordpress;" | mysql -u root && \
-    echo "GRANT ALL PRIVILEGES ON wordpress.* TO 'root'@'localhost';" | mysql -u root && \
-    echo "update mysql.user set plugin = 'mysql_native_password' where user='root';" | mysql -u root  && \
-    mysql wordpress -u root --password=  < ./root/wordpress.sql
-RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj '/C=FR/ST=75/L=Paris/O=42/CN=sdunckel' -keyout /etc/ssl/certs/localhost.key -out /etc/ssl/certs/localhost.crt
-RUN chown -R www-data:www-data *
-RUN chmod 755 -R *
+#SLL SETUP
+RUN mkdir ~/mkcert && \
+  cd ~/mkcert && \
+  wget https://github.com/FiloSottile/mkcert/releases/download/v1.1.2/mkcert-v1.1.2-linux-amd64 && \
+  mv mkcert-v1.1.2-linux-amd64 mkcert && \
+  chmod +x mkcert && \
+./mkcert -install && \
+./mkcert localhost
+RUN rm var/www/html/index.nginx-debian.html
 
 #START
-COPY ./start.sh /var
 
-CMD bash /var/start.sh
+COPY srcs/index.html var/www/html/index.html
 
 EXPOSE 80 443
+
+ENTRYPOINT 	service nginx start && \
+			service php7.3-fpm start && \
+			service mysql start && \
+			sleep infinity && \
+			wait
