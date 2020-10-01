@@ -10,10 +10,23 @@ RUN apt-get -y install mariadb-server
 RUN apt-get -y install php-mysql php-fpm php-mbstring
 RUN apt-get -y install wget
 
-#COPY FILES
+#NGINX
 
-COPY srcs/nginx-config etc/nginx/sites-available/
-RUN  ln -s /etc/nginx/sites-available/nginx-config etc/nginx/sites-enabled/
+COPY srcs/nginx.conf etc/nginx/sites-available/
+RUN  ln -s /etc/nginx/sites-available/nginx.conf etc/nginx/sites-enabled/
+
+#SLL SETUP
+
+RUN mkdir ~/mkcert && \
+  cd ~/mkcert && \
+  wget https://github.com/FiloSottile/mkcert/releases/download/v1.1.2/mkcert-v1.1.2-linux-amd64 && \
+  mv mkcert-v1.1.2-linux-amd64 mkcert && \
+  chmod +x mkcert && \
+./mkcert -install && \
+./mkcert localhost
+
+#COPY ALL
+
 COPY srcs/wordpress.tar.gz /var/www/html/
 COPY srcs/wp-config.php /var/www/html/
 COPY srcs/mysql_setup.sql ./root/
@@ -38,16 +51,6 @@ tar -xzvf latest.tar.gz && rm latest.tar.gz
 RUN cd var/www/html && cp -a wordpress/* . 
 RUN chown -R www-data:www-data /var/www/html/ && chmod -R 755 /var/www/html/  
 COPY srcs/wp-config.php /var/www/html/wordpress
-
-#SLL SETUP
-RUN mkdir ~/mkcert && \
-  cd ~/mkcert && \
-  wget https://github.com/FiloSottile/mkcert/releases/download/v1.1.2/mkcert-v1.1.2-linux-amd64 && \
-  mv mkcert-v1.1.2-linux-amd64 mkcert && \
-  chmod +x mkcert && \
-./mkcert -install && \
-./mkcert localhost
-RUN rm var/www/html/index.nginx-debian.html
 
 #START
 
